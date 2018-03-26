@@ -1,0 +1,491 @@
+---
+title: "Exploring the 2013 BRFSS Data"
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+  pdf_document: default
+---
+
+### Michael Caiati
+### 3/2018
+
+## R Environment and Data
+
+```{r load-packages, message = FALSE}
+#Load Packages
+library(ggplot2)
+library(dplyr)
+#setwd()
+fileUrl <- "https://d18ky98rnyall9.cloudfront.net/_384b2d9eda4b29131fb681b243a7767d_brfss2013.RData?Expires=1521331200&Signature=WVjO4F-AfC8lGNUii6pm-XrS1owWu-Igsq9KywJ9Tk3zUyoO7FRq2npcVHtj8rXfGwe9SzwbXt7bix56wwcGMz3GzojW~NA5quBi28OvSI1CnJ0IZOYD8XV3M5W-0Ju92qJbJ6jFFigSMPqbvreSRUzA1uC3iNiD1sN08785Ay4_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A"
+```
+
+## Load Data to Workspace
+
+```{r load-data}
+#Load Data
+load("brfss2013.RData")
+```
+
+* * *
+
+### Scope of Inference
+
+**Generalizability:**
+This vast data frame with 330 variables by 491,775 observations can be used to help address many wellness related questions. Random sampling techniques were used. All states and territories where data was collected for 2013, conducted landline and cell phone data collection."Home telephone numbers are obtained through random-digit dialing."^1^ 
+However, there are caveats which seem initially to be problematic when it comes to generalizability:
+"The number of interviews within each state will vary based on funding."^2^ An important follow up question would be how does the study attempt to account for variability and to the extent possible maintain generalizability? The need for generalizability is understood by survey designers, they have attempted to make the survey more generalizable by using stratification and more recently raking.
+<br>
+The Behavioral Risk Factor Surveillance System is an annual collection of state surveys. The population of interest is the population of the United States. Post-stratification at the state level was used to weight BRFSS survey data from 1984 to 2010. This accounted for factors such as "age, race and ethnicity, gender, geographic region, and other known characteristics of a population." Since 2011, BRFSS has used iterative proportional fitting (Raking). "Raking differs from post-stratification because it incorporates adjustor variables one at a time in an iterative process, rather than imposing weights for demographic subgroups in a single process."^3^ 
+Raking allows iterative adjustment based on additional factors such as education level, marital status, renter or owner status, and phone source. With different rates of mass adoption of cellphones by subsets of the population; more accurately accounting for this factor has become increasingly important. "Regardless of state sample design, use of the final weight in analysis is necessary if users are to make generalizations from the sample to the population."^4^ 
+<br>
+While the study is generalizable, the CDC provides substantial documentation on generalizability with various state specific issues. Because of variability based on funding as well as when the studys were conducted among other issues; the case for generalizability is stronger at the individual state level than at the national level.
+<br>
+*References*
+<br>
+[1]: (https://www.cdc.gov/brfss/annual_data/all_years/states_data.htm)<br>
+[2]: (https://www.cdc.gov/brfss/about/brfss_faq.htm)<br>
+[3]: (https://www.cdc.gov/surveillancepractice/reports/brfss/brfss_faqs.html)<br>
+[4]: (https://www.cdc.gov/brfss/annual_data/2013/pdf/weighting_data.pdf)<br>
+
+**Causality:**
+This is a coordinated collection of state health surveys. Random assignment was not used and therefore causality cannot be inferred from this study. 
+
+* * *
+
+In the interest of typing less, we will rename our original data frame "X".
+
+```{r}
+X <- brfss2013
+```
+
+* * *
+
+## Exploratory Data Analysis
+
+**Research Quesion 1:**
+
+Our questions should inform the data we use. We might be broadly interested in identifying an association between income and illness; or, physical attributes and illness. The interest could be part of academic research to inform government agency policy. With this in mind, let us first consider height and weight. Understanding these variables will provide a solid basis thinking about the data set broadly, and later allow us to apply our understanding to illness, age and income variables. What kind of relationship would we expect to see between height and weight? Does the data reflect what we would expect? And which height and weight variables should we use? 
+
+```{r Q1 Initial Structure}
+#Structure of height and weight variables
+X %>%
+  select(htm4, height3, htin4, wtkg3, weight2) %>%
+  str()
+```
+
+We have 5 variables to choose from: "weight2", "wtkg3", "height3", "htin4", and "htm4". 
+The variable "htm4" is derived and shows all reported values in metric units.
+The variable "height3" shows all values as reported, seperately in imperial and metric.
+The variable "htin4" is derived and shows all reported values in imperial.
+The variable "wtkg3" is derived and shows all reported values in metric.
+The variable "weight2" shows all values as reported, in imperial and metric.
+
+Let us first compare the height variables:
+
+```{r}
+#Print summary of "htm4"
+summary(X$htm4)
+head(sort(X$htm4))
+tail(sort(X$htm4))
+#sort(X$htm4)
+```
+
+If we uncomment the final line of code above and run its long output (or simply view histograms below) we will notice the values for "htm4" have periodic gaps (this is due to integer rounding after converting reported imperial values to metric, only 0.38% of the 491,775 observations were reported and initially recorded in metric). This is a reason we may not want to use this variable to analyze height. Let's finish up with "htm4" by eliminating outliers. The histograms generated with different binwidths show the crudeness of the rounding even with this massive sample.
+
+```{r Distribution of Height 1}
+#Eliminate outliers and print summary statistics
+Xh <- X[(X$htm4 >= 91 & X$htm4 <= 236),]
+summary(Xh$htm4)
+#Plot the metric height distribution
+p1h <- ggplot(Xh, aes(x = htm4))
+p1h + geom_histogram(binwidth = 1, na.rm = TRUE) + theme_classic()
+#And with a binwidth of 2
+p1h + geom_histogram(binwidth = 2, na.rm = TRUE) + theme_classic()
+```
+
+We can see the gaps illustrated in the histograms. For rough estimation "htm4" may be otherwise useful; but let us take a look at "height3" the variable that has the data in the units in which it was reported.
+
+```{r}
+#Raw summary and structure of "height3"
+summary(X$height3)
+head(sort(X$height3))
+tail(sort(X$height3))
+str(X$height3)
+```
+
+Now, the integer variable "height3", has different issues. According to the codebook; if "About how tall are you without shoes?" is answered in feet and inches, the recorded value is between 200 and 711 (1 digit for feet, 2 for inches). Those who responded in feet and inches made up 98.07% of repondents. Let's isolate those observations that were reported in imperial units and create a new data frame for our analysis:
+
+```{r Height in feet and inches}
+#Eliminate outliers, overwrite Xh and print summary statistics
+Xh <- X[(X$height3 >= 200 & X$height3 <= 711),]
+summary(Xh$height3)
+#String type
+class(Xh$height3)
+```
+
+Because "height3" is an integer variable, for a chart showing its distribution to be an effective visual we need to convert the variable to a factor due to the manner in which the variable was recorded. 
+
+```{r Distribution of Height 2}
+#Plot distribution as factor variable
+p1h <- ggplot(Xh, aes(factor(x = height3)))
+p1h + geom_bar() + theme_void() + labs(title = "Height as a Factor with NAs")
+```
+
+Next, in the interest of including values reported in imperial and metric the last option for a height variable whose distribution will look similar. Below we see height in inches with "htin4" and according to the codebook we will eliminate outliers and create a new data frame including the 0.38% of values that were reported and recorded in metric. Unlike "htm4" this variable naturally mitigates integer rounding crudeness for those conversions from cm to inches.
+
+```{r Distribution of Height 3}
+#View initial structure and summary of "htin4"
+head(sort(X$htin4))
+tail(sort(X$htin4))
+summary(X$htin4)
+str(X$htin4)
+#Eliminate outliers according to codebook
+Xh <- X[(X$htin4 >= 36 & X$htin4 <= 95),]
+summary(Xh$htin4)
+str(Xh$htin4)
+#Plot height distribution in inches
+p1h <- ggplot(Xh, aes(x = htin4))
+p1h + geom_histogram(binwidth = 1, na.rm = TRUE) + theme_bw() + labs(title = "Height")
+```
+
+Notice the median of "htin4" at 66 inches matches the median of "height3" at 506 (5'6"). As we might expect, there seems to be a slight self-reporting effect at the pyschologically significant 60 inch and the 72 inch levels. Because of the scale and the fact that we are including all observations, the "htin4" variable seems to be a good choice for our height variable. 
+<br>
+Now let us select a weight variable. The first weight variable we will look at is "wtkg3", according to the codebook this is a calculated variable from "weight2", we will eliminate the outliers and plot "wtkg3" (the value is in kilograms multiplied by 100).
+
+```{r Weight Variable in Metric}
+#Summary Statistics for "wtkg3"
+summary(Xh$wtkg3)
+str(Xh$wtkg3)
+head(sort(Xh$wtkg3))
+tail(sort(Xh$wtkg3))
+```
+
+```{r Distribution of Weight 1}
+#Eliminate outliers, print summary statistics
+Xw <- Xh[(Xh$wtkg3 >= 2300 & Xh$wtkg3 <= 9295),]
+summary(Xw$wtkg3)
+#Plot weight distribution in kg
+p1w <- ggplot(Xw, aes(x = wtkg3))
+p1w + geom_histogram(binwidth = 50, na.rm = TRUE) + theme_classic()
+```
+
+Because it is a derived variable, "wtkg3" has a similar integer rounding issue as "htm4" so let us look at the other weight variable. Now, "weight2" is a factor variable; from it, we will create a numeric variable with the "mutate" function and name it "weight_lbs".
+
+```{r}
+#Mutate string to numeric
+Xw <- Xh %>%
+  mutate(weight_lbs = as.numeric(as.character(weight2)))
+```
+
+```{r Weight Variable in Imperial}
+#Initial summary stats
+summary(Xw$weight_lbs)
+#New string type
+class(Xw$weight_lbs)
+head(sort(Xw$weight_lbs))
+tail(sort(Xw$weight_lbs))
+```
+
+```{r}
+#Eliminate outliers according to codebook
+Xw <- Xw[(Xw$weight_lbs <= 999),]
+```
+
+```{r}
+#Summary stats for "weight_lbs"
+summary(Xw$weight_lbs)
+head(sort(Xw$weight_lbs))
+tail(sort(Xw$weight_lbs))
+```
+
+Below, we have the distribution of "weight_lbs" our mutated weight variable. There seems to be a slight but noticeable self-reporting effect at the psycologically significant levels of 200 pounds and 300 pounds. 
+<br>
+We will again view the distribution of "htin4", and finally, height and weight together. 
+
+```{r Q1 Final Plots}
+#Plot distribution of weight
+p1w <- ggplot(Xw, aes(x = weight_lbs))
+p1w + geom_histogram(binwidth = 10, na.rm = TRUE) + theme_linedraw() + labs(title = "Weight")
+#Again plot the histogram for height
+p1h <- ggplot(Xh, aes(x = htin4))
+p1h + geom_histogram(binwidth = 1, na.rm = TRUE) + theme_linedraw() + labs(x = "Height (inches)", title = "Height")
+#Plot distributions of chosen height and weight variables together
+p1hw <- ggplot(Xw, aes(x = htin4, y = weight_lbs))
+p1hw + geom_count(na.rm = TRUE) + theme_linedraw() + theme(legend.position = "none") + labs(x = "Height", y = "Weight", title = "Height and Weight")
+```
+
+It appears that the distribution of weight_lbs (median = 170.0, mean = 176.7) is somewhat more right-skewed; and htin4 (median = 66.00, mean = 66.66) is somewhat more symetric. Relative to each other, this is apparent in the final "Height and Weight" chart with both distributions where it is more symetrical across the x-axis and less symetrical across the y-axis. Finally, as we should have initially expected, height and weight appear to be positively related (taller people generally appear to weigh more).
+
+* * *
+
+**Research Quesion 2:**
+
+Next, we are interested in how income is associated with illness. One confounding variable for the analysis of income and illness, we might assume, is age. How are diabetes, age and income associated?  
+
+```{r Q2 Initial Structure}
+#Data structure for age, diabetes and income
+Xadi <- X %>%
+  select(X_ageg5yr, diabete3, income2) %>%
+  str()
+```
+
+All three are categorical variables. Before we get started, we need to eliminate NA responses from our data frame for each of the three variables. First, age:
+
+```{r Age df Structure}
+#Eliminate NAs, view structure
+Xadi <- X[!is.na(X$X_ageg5yr),]
+Xadi %>%
+  select(X_ageg5yr, diabete3, income2) %>%
+  str()
+```
+
+Next, diabetes:
+
+```{r Diabetes df Structure}
+#Eliminate NAs, view structure
+Xadi <- Xadi[!is.na(Xadi$diabete3),]
+Xadi %>%
+  select(X_ageg5yr, income2, diabete3) %>%
+  str()
+```
+
+And, income: 
+
+```{r Income df Structure}
+#Eliminate NAs and view structure
+Xadi <- Xadi[!is.na(Xadi$income2),]
+Xadi %>%
+  select(income2, X_ageg5yr, diabete3) %>%
+  str()
+```
+
+In order to initiate simple and useful analysis on these variables, we might want to use a binary classification model. We can simplify the number of factor levels down to two for each variable. Our binary age variable will output TRUE when the observation is age 55 or older.
+
+```{r Age Binary Variable}
+#Create a binary age variable named "age_55"
+age_55 <- (Xadi$X_ageg5yr == "Age 55 to 59" | Xadi$X_ageg5yr == "Age 60 to 64" | Xadi$X_ageg5yr == "Age 65 to 69" | Xadi$X_ageg5yr == "Age 70 to 74" | Xadi$X_ageg5yr == "Age 75 to 79" | Xadi$X_ageg5yr == "Age 80 or older")
+summary(age_55)
+```
+
+Next, let us create a binary diabetes variable which groups all non-"No" responses as TRUE:
+
+```{r Diabetes Binary Variable}
+#Create a binary diabetes variable named "d_yes"
+d_yes <- (Xadi$diabete3 != "No")
+summary(d_yes)
+```
+
+Lastly, a binary income variable which outputs TRUE when respondent is in a level under $35,000: 
+
+```{r Income Binary Variable}
+#Create a binary income variable named "low_i"
+low_i <- (Xadi$income2 == "Less than $10,000" | Xadi$income2 == "Less than $15,000" | Xadi$income2 == "Less than $20,000" | Xadi$income2 == "Less than $25,000" | Xadi$income2 == "Less than $35,000")
+summary(low_i)
+```
+
+Let us look at the 8 income levels and how the binary classification splits the data.
+
+```{r Income Summarize}
+#Income levels
+Xadi %>%
+  group_by(income2) %>%
+  summarize(count = n())
+```
+
+```{r}
+#Plot Income levels and binary classification
+p1i <- ggplot(Xadi, aes(x = income2, fill = low_i))
+p1i + geom_bar() + scale_x_discrete(name = "Income", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + theme_classic() + theme(legend.position = "bottom")
+```
+
+Next, we will look at the 13 Age levels.
+
+```{r Age Summarise}
+#Age levels
+Xadi %>%
+group_by(X_ageg5yr) %>%
+summarise(count = n())
+```
+
+```{r}
+#Plot age levels with binary classification
+p1a <- ggplot(Xadi, aes(x = X_ageg5yr, fill = age_55))
+p1a + geom_bar() + scale_x_discrete(name = "Age", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme_classic() + theme(legend.position = "bottom")
+```
+
+And, let us look at the 4 levels for diabetes with the binary classification shown.
+
+```{r Diabetes Summarize}
+#Diabetes levels
+Xadi %>%
+group_by(diabete3) %>%
+summarize(count = n())
+```
+
+```{r Diabetes level by Binary Diabetes Count}
+#Plot diabetes levels with binary classification
+p1d <- ggplot(Xadi, aes(x = diabete3, fill = d_yes))
+p1d + geom_bar() + scale_x_discrete(name = "Diabetes", labels = c("Yes", "While Pregnant", "No", "Pre-Diabetes")) + theme_classic() + theme(legend.position = "bottom")
+```
+
+### Diabetes
+
+Now that we have some simplified variables, our charts that follow will display diabetes proportionally within each income and age factor level. 
+
+```{r Age level by Binary Diabetes proportion}
+#Plot binary diabetes within each age level
+p2a <- ggplot(Xadi, aes(x = X_ageg5yr, fill = d_yes))
+p2a + geom_bar(position = "fill") + scale_x_discrete(name = "Age level", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme_dark() + theme(legend.position = "bottom")
+#Plot all diabetes responses within each age level
+p3a <- ggplot(Xadi, aes(x = X_ageg5yr, fill = diabete3))
+p3a + geom_bar(position = "fill") + scale_x_discrete(name = "Age level", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + scale_fill_discrete(name = "Diabetes", labels = c("Yes", "While Pregnant", "No", "Pre-Diabetes")) + theme_dark() + theme(legend.position = "bottom")
+```
+
+Next, let us see how income is related to diabetes. The first bar chart will show the "d_yes" in each income level and the following chart will reflect this with all "diabete3" responses.
+
+```{r}
+#Plot binary diabetes variable within each income level
+p2i <- ggplot(Xadi, aes(x = income2, fill = d_yes))
+p2i + geom_bar(position = "fill") + scale_x_discrete(name = "Income", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + scale_fill_discrete(name = "Diabetes", labels = c("No", "Yes")) + theme_dark() + theme(legend.position = "bottom")
+#Plot diabetes within each income level
+p3i <- ggplot(Xadi, aes(x = income2, fill = diabete3))
+p3i + geom_bar(position = "fill") + scale_x_discrete(name = "Income", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + scale_fill_discrete(name = "Diabetes", labels = c("Yes", "While Pregnant", "No", "Pre-Diabetes")) + theme_dark() + theme(legend.position = "bottom")
+```
+
+### Income and Age
+
+Which age levels have highest proportion of income under $35,000? Which income levels have the highest share of age 55 or older?
+
+```{r Binary Income Proportion by Age level}
+#Plot binary income within age levels
+p4a <- ggplot(Xadi, aes(x = X_ageg5yr, fill = low_i))
+p4a + geom_bar(position = "fill") + scale_x_discrete(name = "Age level", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme_dark() + theme(legend.position = "bottom")
+#Plot binary age within income levels
+p4i <- ggplot(Xadi, aes(x = income2, fill = age_55))
+p4i + geom_bar(position = "fill") + scale_x_discrete(name = "Income level", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + theme_dark() + theme(legend.position = "bottom")
+```
+
+As we might expect, among the young and old those who have income under \$35,000 make up the largest share; while those mid-career between age 35 and 59 seem to have the lowest proportion of income below $35,000.
+
+"age_55" is TRUE when age is 55 and older. We can see below, that possibly due to Social Security, even though we would assume many more in the 55 and older group are retired and not working than those age 18 to 54; of those who make "Less than $10,000" the age distribution skews younger.
+
+```{r}
+#Plot Age level within each income level
+p5i <- ggplot(Xadi, aes(x = income2, fill = X_ageg5yr))
+p5i + geom_bar(position = "fill") + scale_x_discrete(name = "Income level", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + scale_fill_discrete(name = "Age", labels = c("18 to 24", "25 to 29", "30 to 34", "35 to 39", "40 to 44", "45 to 49", "50 to 54", "55 to 59", "60 to 64", "65 to 69", "70 to 74", "75 to 79", "80 Plus")) + theme_dark() + theme(legend.position = "bottom")
+#Plot income level within each age level
+p5a <- ggplot(Xadi, aes(x = X_ageg5yr, fill = income2))
+p5a + geom_bar(position = "fill") + scale_fill_discrete(name = "Income", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + scale_x_discrete(name = "Age level", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme_dark() + theme(legend.position = "bottom")
+```
+
+### Diabetes Age and Income
+
+Lastly, we will come back to diabetes. How are the levels of age and income distributed within each diabetes response?
+
+```{r}
+#Plot age levels within each diabetes level
+p2d <- ggplot(Xadi, aes(x = diabete3, fill = X_ageg5yr))
+p2d + geom_bar(position = "fill") + scale_x_discrete(name = "Diabetes", labels = c("Yes", "While Pregnant", "No", "Pre-Diabetes")) + theme_classic() + scale_fill_grey(name = "Age", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme(legend.position = "bottom")
+#Plot age levels within each diabetes level
+p3d <- ggplot(Xadi, aes(x = diabete3, fill = income2))
+p3d + geom_bar(position = "fill") + scale_x_discrete(name = "Diabetes", labels = c("Yes", "While Pregnant", "No", "Pre-Diabetes")) + theme_classic() + scale_fill_grey(name = "Income", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000")) + theme(legend.position = "bottom")
+```
+
+As we might expect, those with diagnosed diabetes or pre-diabetes the age distribution generally skews older. The distribution of those who do not have diagnosed diabetes and those told they have diabetes only while pregnant skew younger. 
+<br>
+The income distribution within each diabetes category is also shown above. The income distribution of those without diagnosed diabetes skews the most toward the highest earners. While the income distribution of those with diagnosed diabetes or pre-diabetes, relatively skews more toward the lowest earners.  
+
+* * *
+
+**Research Quesion 3:**
+
+To reiterate, we are broadly interested in the relationship between income and illness. We will set aside height and weight for now. At this point in our exploratory analysis we will broaden our "Illness" metric. Specifically, we will create another binary variable which encompasses diabetes along with arthritis, depression, and asthma to create a broader "Illness" variable. Keeping in mind the results when isolating diabetes alone, what association will we find between "Illness", age and income. Will this broader measure of illness be similarly distributed accross age and income?
+
+```{r Q3 Initial Data Structure}
+#Data structure
+Xadi %>%
+  select(havarth3, addepev2, asthma3) %>%
+  str()
+```
+
+All three are categorical variables. Before we get started, we need to eliminate NA responses from our data frame for each of the three variables. Notably, of the 3 new variables, arthritis has the largest number of positive instances
+
+```{r}
+#Eliminate Arthritis NAs
+Xadi3 <- Xadi[!is.na(Xadi$havarth3),]
+#Eliminate Depression NAs
+Xadi3 <- Xadi3[!is.na(Xadi3$addepev2),]
+#Eliminate Asthma NAs
+Xadi3 <- Xadi3[!is.na(Xadi3$asthma3),]
+#Print responses
+Xadi3 %>%
+  group_by(havarth3, addepev2, asthma3) %>%
+  summarise(count = n())
+```
+
+```{r}
+#New data structure for Arthritis, Depression and Asthma
+Xadi3 %>%
+  select(havarth3, addepev2, asthma3) %>%
+  str()
+```
+
+### Binary Illness Variable
+
+```{r Q3 Filtered}
+#Include diabetes, group and filter
+Xadi3 %>%
+  group_by(havarth3, addepev2, asthma3, diabete3) %>%
+  filter(havarth3 == "Yes" | addepev2 == "Yes" | asthma3 == "Yes" | diabete3 != "No" ) %>%
+  summarise(count = n())
+```
+
+"Illness" is "Sick" if any of the questions on arthritis, depression, asthma, or diabetes were answered with a positive response; and "Healthy" otherwise.
+
+```{r Binary Illness Variable}
+#Create Illness variable
+Xadi3 <- Xadi3 %>%
+  mutate(Illness = ifelse((havarth3 == "Yes" | addepev2 == "Yes" | asthma3 == "Yes" | diabete3 != "No"), "Sick", "Healthy"))
+Xadi3 %>%
+  group_by(Illness) %>%
+  summarise(count = n())
+```
+
+We can view age and income distributions within "Illness" to get an overview of our new variable.
+
+```{r Binary Illness Plot}
+#Plot Income within binary "Illness" variable
+p1ill <- ggplot(Xadi3, aes(x = Illness, fill = income2))
+p1ill + geom_bar(position = "fill", na.rm = TRUE) + theme_dark() + theme(legend.position = "bottom")
+#Plot Age within binary "Illness" variable 
+p1ill <- ggplot(Xadi3, aes(x = Illness, fill = X_ageg5yr))
+p1ill + geom_bar(position = "fill", na.rm = TRUE) + theme_dark() + theme(legend.position = "bottom")
+```
+
+Below, as we might assume, "Illness", like diabetes alone, appears to have a similar relationship to both income and age. 
+
+```{r Q3 Plot 1}
+#Plot binary "Illness" within each income factor level
+p5i <- ggplot(Xadi3, aes(x = income2, fill = Illness))
+p5i + geom_bar(position = "fill") + theme_dark() + theme(legend.position = "bottom") + scale_x_discrete(name = "Income", labels = c("<$10,000", "<$15,000", "<$20,000", "<$25,000", "<$35,000", "<$50,000", "<$75,000", ">$75,000"))
+#Binary "Illness" variable within Age factor level
+p5i <- ggplot(Xadi3, aes(x = X_ageg5yr, fill = Illness))
+p5i + geom_bar(position = "fill") + scale_x_discrete(name = "Age level", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme_dark() + theme(legend.position = "bottom")
+```
+
+Finally, we can use facets to display all three variables on the same chart. 
+
+```{r}
+#Plot 3 variables binary Illness within age and income factor levels
+Xadi3$income2 <- factor(Xadi3$income2, labels = c("<$10k", "<$15k", "<$20k", "<$25k", "<$35k", "<$50k", "<$75k", ">$75k"))
+p33 <- ggplot(Xadi3, aes(x = X_ageg5yr))
+p33 + geom_bar(position = "fill", aes(fill = Illness)) + facet_grid(income2 ~ ., labeller = label_context) + scale_x_discrete(name = "Age", labels = c("18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+")) + theme_dark() + theme(legend.position = "right") 
+```
+
+As this project is exploratory in nature, there are any number of additional questions that have been raised. Going forward we can include height and weight in future analysis. We could use a binary classification model to analyze two of our derived binary variables together. For the relationships we explored, we could think about what are some other additional confounding variables? Location (environmental effects), wealth (home ownership) and many other variables that may contribute as illness inputs. Additionally, we should use the provided weighting and demographic variables to compare stratification and raking. Eventually, it may be interesting to seek out other survey or lab data sets to explore the same questions. 
+
+* * *
+
+* * *
